@@ -11,6 +11,12 @@ type QuestionType = Literal["text", "confirm", "select", "print", "search"]
 type AnswerType = type[str|bool|int|float|date|datetime|time|list[str]]
 ConfidenceLevel = {"not confident", "kind of confident", "confident", "very confident", "extremely confident"}
 
+@dataclass(slots=False)
+class TimeInfo:
+    hours: int=0
+    minute: int=0
+    second: int=0
+    microsecond: int=0
 
 class StrFormats(StrEnum):
     """
@@ -39,7 +45,14 @@ class TimePrompt(PromptBase[date]):
     err_msg = {"non_digit": "[prompt.invalid]Non numerical character detected !",
                "format": "[prompt.invalid]Invalid time format ! (H*n:MM:SS.MS) only"}
 
-    def validate_time_unit_2(self, value: str):
+
+    def unit_in_value(self, value: str):
+        for unit in self.units:
+            if unit in value:
+                return unit
+        return False
+
+    def determine_unit(self,value: str):
         for char in value:
             if char == ":" or char == ".":
                 continue
@@ -65,42 +78,43 @@ class TimePrompt(PromptBase[date]):
         rprint(f"[bold red underline]{unit}")
 
 
-    #
-    # def validate_time_unit(self, value: str):
-    #     unit = ""
-    #     unit_idx = 0
-    #     time_info = {}
-    #     for idx, char in enumerate(value):
-    #         if char.isdigit() or char == "." or char == ":" or char.isspace():
-    #             continue
-    #         elif char.isalpha() and idx > 0:
-    #             unit = value[idx:]
-    #             value = value.replace(unit,"").strip()
-    #             if unit.endswith("s"):
-    #                 unit = unit[0:-1]
-    #             break
-    #         else:
-    #             raise InvalidResponse(f"Unsupported character: {char}")
-    #     if unit not in self.valid_time_units:
-    #         raise InvalidResponse(self.invalid_unit_err_msg)
-    #     unit_idx = self.units.index(unit)
-    #     time_intervals = value.split(":")
-    #     if "." in time_intervals[-1]:
-    #         time_intervals = time_intervals[0:-1] + time_intervals[-1].split(".")
-    #     time_info["unit"] = unit 
-    #     time_info["intervals"] = {}
-    #     time_info["intervals"][unit] = time_intervals[0]
-    #     time_info["time"] = value
-    #     if unit != "milisecond":
-    #         for idx,interval in enumerate(self.units[unit_idx + 1:], 1):
-    #             if idx >= len(time_intervals):
-    #                 break
-    #             time_info["intervals"][interval] = time_intervals[idx]
-    #     return time_info
-    #
+    def split_time_units(self, value: str, unit: str):
+        time_info = {}
+        unit_idx = self.units.index(unit)
+        if unit + "s" in value: 
+            value = value.replace(unit + "s", "")
+        value = value.replace(unit, "")
+        if value.find(":") == -1 and value.find(".") == -1:
+            split_units = value
+        elif unit == "second" or unit == "microsecond":
+            split_units = value.split(".")
+        elif value.find("."):
+            split_units = value.split(":") + value.split(".")
+        else:
+            split_units = value.split(":") 
+        for idx,time_unit in enumerate(self.units[unit_idx:]):
+            try:
+                time_info[time_unit] = split_units[idx]
+            except Exception:
+                break
+        rprint(time_info)
+        return time_info
+
+        
+
+
+
+
+    def validate_time_unit(self, value: str):
+        if not (unit := self.unit_in_value(value)):
+            self.determine_unit(value)
+        else:
+            time_info = self.split_time_units(value,unit)
+            return time(*time_info)
+
 
     def process_response(self, value: str, confirm_time: bool=True) -> time:
-        rprint(self.validate_time_unit_2(value))
+        rprint(self.validate_time_unit(value))
 
 
 
