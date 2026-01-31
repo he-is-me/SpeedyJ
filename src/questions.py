@@ -88,15 +88,6 @@ QUESTIONS: dict[str, list[Question]] = {
 answers = {}
 
 
-class SpeedyText(Text):
-    def __init__(self, text: str):
-        self.text: str = text
-        ...
-
-    def to_str(self):
-        return str(self.text)
-
-
 
 def date_prompt(return_as: type[str|date|datetime]=date):
     chosen_date = DatePrompt().ask("when are you gonna start ?", choices=["now", "later"])

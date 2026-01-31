@@ -1,5 +1,6 @@
 from types import FunctionType
 from rich import print as rprint
+import ulid
 from rich.prompt import Confirm, IntPrompt, PromptType, InvalidResponse, PromptBase
 from typing import Any, Final, NamedTuple, Literal, NewType, Text, TypedDict, Callable
 from enum import StrEnum
@@ -75,7 +76,7 @@ class TimePrompt(PromptBase[date]):
                 unit = "miliseconds"
             else:
                 unit = "seconds"
-        rprint(f"[bold red underline]{unit}")
+        return unit
 
 
     def split_time_units(self, value: str, unit: str):
@@ -107,14 +108,13 @@ class TimePrompt(PromptBase[date]):
 
     def validate_time_unit(self, value: str):
         if not (unit := self.unit_in_value(value)):
-            self.determine_unit(value)
-        else:
-            time_info = self.split_time_units(value,unit)
-            return time(*time_info)
+            unit = self.determine_unit(value)
+        time_info = self.split_time_units(value,unit)
+        return time(*time_info)
 
 
     def process_response(self, value: str, confirm_time: bool=True) -> time:
-        rprint(self.validate_time_unit(value))
+        return self.validate_time_unit(value)
 
 
 
@@ -215,8 +215,6 @@ class GoalID:
     node_id: GID
     node_pos: float
     parent_pos: float
-    children_pos: list[float]
-    sibling_pos: list[float]|None=None
     tree_root: bool=False # true if the node is the root node of the whole tree
     branch_root: bool=False # true if the node is a root node of a inner tree
                             # meaning if goals branch from this node its a root branch
