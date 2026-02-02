@@ -168,12 +168,6 @@ QUESTIONS: dict[str, list[Question]] = {
         },
         {
             "type": "text",
-            "name": "starting",
-            "answer_type": time,
-            "question": "when will you start ??"
-        },
-        {
-            "type": "text",
             "name": "goal",
             "answer_type": str,
             "question": "What is the intent of this goal ?"

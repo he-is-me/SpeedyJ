@@ -12,64 +12,36 @@ CREATE TABLE trees(
   completion_percentage REAL NOT NULL CHECK(completion_percentage >= 0 and completion_percentage <= 100.0)
 )
 
-CREATE TABLE goals(
+
+CREATE TABLE nodes(
   id INTEGER PRIMARY KEY,
   tree_id INTEGER NOT NULL,
   node_id INTEGER NOT NULL,
+  parent_id INTEGER NOT NULL,
   node_pos REAL NOT NULL,
+  goal_type TEXT NOT NULL CHECK(goal_type in ("goal", "task", "recursive task")),
+  goal_info JSON, -- this is where all other arbitrary but relavent info goes 
   status TEXT NOT NULL CHECK(status in ("complete", "incomplete", "locked", "in progress")) DEFAULT "incomplete",
   prerequisite TEXT,
   postrequisite TEXT,
-  goal TEXT NOT NULL,
+  intent TEXT NOT NULL,
   priority NUMERIC NOT NULL DEFAULT 0, 
   importance NUMERIC NOT NULL DEFAULT 0,
   difficulty NUMERIC NOT NULL DEFAULT 0,
   start_date INTEGER,
-  due_date INTEGER NOT NULL, 
+  due_date INTEGER, 
   days_past_due INTEGER NOT NULL DEFAULT 0,
-  days_until_due INTEGER,
+  days_until_due INTEGER NOT NULL,
   description TEXT,
-  parent INTEGER NOT NULL,
+  post_completion_info INTEGER,
   siblings TEXT,
   children TEXT
 )
 
 
-CREATE TABLE tasks(
-  id INTEGER PRIMARY KEY,
-  tree_id INTEGER NOT NULL,
-  parent_id INTEGER,
-  node_id INTEGER,
-  node_pos REAL NOT NULL,
-  task_completion_type TEXT NOT NULL CHECK (task_type in ("binary", "recursive")),
-  max_recursion NUMERIC,
-  recursion_count NUMERIC,
-  prerequisite TEXT,
-  postrequisite TEXT,
-  goal TEXT NOT NULL,
-  priority NUMERIC,
-  importance NUMERIC,
-  difficulty NUMERIC,
-  start_date INTEGER,
-  due_date INTEGER NOT NULL, 
-  description TEXT,
-  FOREIGN KEY(parent_id) REFERENCES goals(node_id)
-  FOREIGN KEY(tree_id) REFERENCES goals(tree_id)
-  UNIQUE(node_id)
-)
-
 
 CREATE TABLE habits(
   id INTEGER PRIMARY KEY,
-  tree_id INTEGER NOT NULL,
-  parent_id INTEGER,
-  node_id INTEGER,
-  node_pos REAL NOT NULL,
-  task_completion_type TEXT NOT NULL CHECK (task_type in ("binary", "recursive")),
-  max_recursion NUMERIC,
-  recursion_count NUMERIC,
-  prerequisite TEXT,
-  postrequisite TEXT,
   goal TEXT NOT NULL,
   priority NUMERIC,
   importance NUMERIC,
@@ -79,6 +51,8 @@ CREATE TABLE habits(
   FOREIGN KEY(tree_id) REFERENCES goals(tree_id)
   UNIQUE(node_id)
 )
+
+
 
 CREATE TABLE connections(
   id INTEGER PRIMARY KEY,

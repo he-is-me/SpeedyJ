@@ -1,3 +1,4 @@
+import json
 from types import FunctionType
 from typing import Any, NamedTuple, Literal, NewType, Text, TypeAlias, TypedDict, Callable
 from enum import StrEnum
@@ -7,20 +8,8 @@ from dataclasses import dataclass
 
 type QuestionType = Literal["text", "confirm", "select", "print", "search"]
 type AnswerType = type[str|bool|int|float|date|datetime|time|list[str]]
-type NodeInfoArray = list[NodeInfo]
 ConfidenceLevel = {"not confident", "kind of confident", "confident", "very confident", "extremely confident"}
 
-
-@dataclass(slots=True)
-class NodeInfo:
-    tree_id: int
-    node_id: int
-    node_pos: float
-
-@dataclass(slots=True)
-class NodeConnection:
-    connection_type: Literal["image", "document", "video"]
-    connected_to: NodeInfo
 
 
 @dataclass(slots=False)
@@ -123,63 +112,42 @@ class Habit:
     complete_today: bool
     questions: dict[str,str]|None=None
 
-@dataclass(slots=True)
-class BaseGoal:
-    id: GoalID
-    alias: str
-    goal: str
-    importance: int|float
-    priority: int|float
-    difficulty: int|float
-    start_date: date|datetime
-    due_date: date|datetime
-    parent: GoalID
-    children: list[GoalID]|GoalID
-    info: dict[str,str]
-    description: str|None=None
 
+@dataclass(slots=True)
+class GoalNode():
+    id: int 
+    tree_id: int
+    node_id: int
+    parent_id: int
+    node_pos: float
+    goal_type: str
+    goal_info: dict
+    status: str 
+    intent: str 
+    start_date: int 
+    due_date: int  
+    days_until_due: int
+    description: str
+    post_completion_info: dict 
+    siblings: list[int]
+    children: list[int]
+    priority: int|float=0
+    importance: int|float=0
+    difficulty: int|float=0
+    days_past_due: int=0
+    prerequisite: list[int]|None=None
+    postrequisite: list[int]|None=None
 
     
-
-    
-@dataclass(slots=True)
-class Goal:
-    id: GoalID
-    alias: str
-    goal: str
-    priority: int
-    importance: int
-    difficulty: int
-    prerequisite: list[GoalID]
-    postrequisite: list[GoalID]
-    status: tuple[float|bool, GoalStatus]
-    goal_type: Literal["binary", "progressive"]
-    description: str|None=None
-    start_date: datetime|date|None=None
-    due_date: datetime|date|None=None
-    deadline_confidence: Confidence|None=None
-    cross_linked: list[GoalID]|None=None
-    if_then_plans: dict[str,str]|None=None
-    success_score: SuccessScore|None=None
-    child_ids: list[int]|None=None
-    questions: dict[str,str]|None=None
-    tags: tuple[str]|None=None
-
 
     def calculate_score(self):
         ...
 
 
     def is_dependent(self):
-        if len(self.prerequisite) != 0:
+        if self.prerequisite is not None and len(self.prerequisite) != 0:
             return True
         return False
-
-
-@dataclass(slots=True)
-class Tasks(Goal):
-    reps: int|float|None=None
-    reps_left: int|float|None=None
 
 
 
