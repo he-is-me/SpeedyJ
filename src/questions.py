@@ -1,13 +1,160 @@
 import builtins
-from secrets import choice
 import string
 from datetime import date, datetime, time
+from rich import print as rprint
 from rich.live import Live
-from custom_types import DatePrompt, IntegerPrompt, TimePrompt
 from rich.prompt import Confirm, FloatPrompt, IntPrompt, InvalidResponse, Prompt
 from custom_types import ConfidenceLevel, Question
 from rich.text import Text
 from rich.console import Console 
+from enum import StrEnum
+from rich.prompt import Confirm, IntPrompt, InvalidResponse, PromptBase
+from datetime import date, datetime, time, timezone
+
+class StrFormats(StrEnum):
+    """
+    dates: 
+    US, EU and ISO standard date formats 
+    2DY = 'two digit year e.g 26'
+    4DY = 'four digit year e.g 2026'
+    """
+    US_DATE_FORMAT_2DY = "%m/%d/%y"
+    US_DATE_FORMAT_4DY = "%m/%d/%Y"
+    US_DATETIME_FORMAT_2DY = "%m/%d/%y %I:%M %p"
+    US_MIL_DATETIME_FORMAT_2DY = "%m/%d/%y H:M" 
+    US_DATETIME_FORMAT_4DY = "%m/%d/%Y %I:%M %p"
+    US_MIL_DATETIME_FORMAT_4DY = "%m/%d/%Y H:M"
+    EU_DATE_FORMAT_2DY = "%d/%m/%Y"
+    EU_DATE_FORMAT_4DY = "%d/%m/%y"
+    ISO_STANDARD_DATE_FORMAT_4DY = "%Y/%m/%d"
+    ISO_STANDARD_DATE_FORMAT_2DY = "%y/%m/%d"
+    TWELVE_HR_TIME_FORMAT = "%I:%M %p"
+    MILITARY_TIME_FORMAT = "%H:%M"
+
+class TimePrompt(PromptBase[date]):
+    response_type = time 
+    units = ["hour", "minute", "second", "milisecond"]  
+    validate_error_message = "[prompt.invalid]Please enter a valid time HH:MM (am or pm) or HH:MM for military time."
+    err_msg = {"non_digit": "[prompt.invalid]Non numerical character detected !",
+               "format": "[prompt.invalid]Invalid time format ! (H*n:MM:SS.MS) only"}
+
+
+    def unit_in_value(self, value: str):
+        for unit in self.units:
+            if unit in value:
+                return unit
+        return False
+
+    def determine_unit(self,value: str):
+        for char in value:
+            if char == ":" or char == ".":
+                continue
+            else:
+                if not char.isdigit():
+                    raise InvalidResponse(self.err_msg["non_digit"])
+        unit = ""
+        colon_count = value.count(":")
+        period_count = value.count(".")
+        if colon_count > 2 or period_count > 1:
+            raise InvalidResponse(self.err_msg["format"])
+        elif colon_count == 2:
+            unit = "hours"
+        elif colon_count == 1:
+            unit = "minutes"
+        elif colon_count == 0 and period_count == 1:
+            period_index = value.index('.') - 1
+            digits = value[:period_index]
+            if all([(not bool(int(digit))) for digit in digits]):
+                unit = "miliseconds"
+            else:
+                unit = "seconds"
+        return unit
+
+
+    def split_time_units(self, value: str, unit: str):
+        time_info = {}
+        unit_idx = self.units.index(unit)
+        if unit + "s" in value: 
+            value = value.replace(unit + "s", "")
+        value = value.replace(unit, "")
+        if value.find(":") == -1 and value.find(".") == -1:
+            split_units = value
+        elif unit == "second" or unit == "microsecond":
+            split_units = value.split(".")
+        elif value.find("."):
+            split_units = value.split(":") + value.split(".")
+        else:
+            split_units = value.split(":") 
+        for idx,time_unit in enumerate(self.units[unit_idx:]):
+            try:
+                time_info[time_unit] = split_units[idx]
+            except Exception:
+                break
+        rprint(time_info)
+        return time_info
+
+        
+
+
+
+
+    def validate_time_unit(self, value: str):
+        if not (unit := self.unit_in_value(value)):
+            unit = self.determine_unit(value)
+        time_info = self.split_time_units(value,unit)
+        return time(*time_info)
+
+
+    def process_response(self, value: str, confirm_time: bool=True) -> time: # pyright: ignore[]
+        return self.validate_time_unit(value)
+
+
+
+
+class DatePrompt(PromptBase[date]):
+    response_type = datetime
+    validate_error_message = "[prompt.invalid]Please enter a valid date MM/DD/YY or M/D/YY"
+
+    def find_correct_format(self,value: str):
+        for format in StrFormats:
+            try:
+                chosen_date = datetime.strptime(value, format.value)
+            except ValueError:
+                continue
+            else:
+                print(f"This is {format.name} format which is {format}")
+                return format
+        raise InvalidResponse("That format does not match one of the avalible ones !")
+
+
+
+
+    def process_response(self, value: str) -> date:
+        if value == "now":
+            curr_utc_datetime= datetime.now(timezone.utc).astimezone()
+            formatted_str = curr_utc_datetime.strftime(StrFormats.US_DATETIME_FORMAT_2DY)
+            formatted_date = curr_utc_datetime.strptime(formatted_str, StrFormats.US_DATETIME_FORMAT_2DY)
+            #NOTE ask user for prefered date format here then save to config !
+            print(f"todays date is: {formatted_str}")
+            return formatted_date
+        elif value == "later":
+            return datetime(1,1,1,1,1,1,1)
+        try:
+            chosen_date = datetime.strptime(value,StrFormats.US_DATE_FORMAT_2DY)
+        except ValueError:
+            format = self.find_correct_format(value)
+            return datetime.strptime(value,format)
+        else:
+            return chosen_date
+
+
+
+class IntegerPrompt(IntPrompt):
+    def process_response(self, value: str): # pyright: ignore[]
+        if value == "Q":
+            return value
+        return super().process_response(value)
+
 
 console = Console(color_system="truecolor")
 
@@ -85,7 +232,6 @@ QUESTIONS: dict[str, list[Question]] = {
 }
 
 
-answers = {}
 
 
 
@@ -268,47 +414,9 @@ def single_select_prompt(question: Text, choices: list[str|Text], lettered_choic
     console.print("DONE!")
 
 
-# will add this multi select feature later, not enough time to worry about this type of stuff now
-# def multi_select_prompt(question: Text, choices: list[str|int|float], lettered_choices: bool=False):
-#     choice_num_len = 1
-#     choice_enum_space = choice_num_len + 2
-#     new_question = show_selections(question.copy(), choices, lettered_choices)
-#     original_question = new_question.copy()
-#     clrs = ["#FA5307","#FA0727", "#07FA8D","#FA34EC"]
-#     with Live(question, console=console, refresh_per_second=4) as live:
-#         while True:
-#             start_pos = len(str(question)) + 1
-#             first_choice_len = len(str(choices[0])) + choice_num_len + 2
-#             end_pos = start_pos + first_choice_len
-#             for idx,choice in enumerate(choices):
-#                 if (idx + 1) > 9: 
-#                     choice_enum_space = choice_enum_space + 1
-#                 if idx != 0:
-#                     curr_choice_len = len(str(choice)) + choice_enum_space
-#                     start_pos += len(str(choices[idx - 1])) + choice_enum_space + 1 
-#                     end_pos = start_pos + curr_choice_len + 1
-#                 new_question = original_question.copy()
-#                 new_question.stylize(style=f"on {clrs[idx%2]} bold underline", start=start_pos,
-#                                      end=end_pos)
-#                 live.update(new_question)
-#                 sleep(1)
-#
-#
-# def raw_input_mode():
-#     fd = sys.stdin.fileno()
-#     old = termios.tcgetattr(fd)
-#     new = termios.tcgetattr(fd)
-#     new[3] = new[3] & ~termios.ECHO          # lflags
-#     try:
-#         termios.tcsetattr(fd, termios.TCSADRAIN, new)
-#     finally:
-#         termios.tcsetattr(fd, termios.TCSADRAIN, old)
-#     return 
-    
-
-
  
 def ask_questions():
+    answers = {}
     for question in QUESTIONS["new_goal"]:
         assert "type" in question
         assert "question" in question
