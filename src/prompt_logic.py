@@ -1,9 +1,12 @@
 import builtins
-from typing import Literal
+import re
+from typing import Any, Literal, NamedTuple, TypedDict
 from rich.live import Live
-from rich.console import Console
+from rich.console import Console, RenderableType
 from rich.text import Text
+from datetime import date, datetime, time
 from time import sleep
+
 
 
 console = Console(color_system="truecolor")
@@ -13,6 +16,31 @@ live_settings = {
         "auto_refresh": False,
         "transient": True
         }
+
+class LiveSettings(NamedTuple):
+    console: Console = console
+    auto_refresh: bool = False
+    transient: bool = True
+
+
+class QuestionSequence():
+    questions: dict[str|Text, tuple[str|None,
+                          Literal["confirm", "numeric","date",
+                                  "datetime", "time", "str"]]]
+    answers: dict[str, Any]
+
+
+time_delta_regex = {
+        ""
+        }
+
+def question_live_ctx(settings: LiveSettings, questions: ):
+    answers = {}
+    with Live(renderable, **settings._asdict()) as live:
+        sleep(4)
+        ...
+    ...
+
 
 def confirm_prompt(question: Text, confirm_type: Literal["yes or no", "true or false"]="yes or no") -> bool:
     f_question = question.copy()
@@ -58,8 +86,18 @@ def number_prompt(question: Text, min_val: int, max_val: int, numeric_type: Lite
                 continue
 
 
+def datetime_prompt(question: Text,
+                    time_type: Literal["date", "datetime", "time"],
+                    min_val: date|datetime|time|None=None,
+                    max_cal: date|datetime|time|None=None, 
+                    ):
+    question = question.append_text(Text(f"\n {time_type}: ", style="italic green"))
+    with Live(question, **live_settings) as live:
+        while True: 
+            answer = console.input()
 
-def datetime_prompt():
+            
+        ...
     ...
 
 def multi_select_prompt():
@@ -77,8 +115,7 @@ def string_prompt():
 
 
 def main():
-    a = confirm_prompt(Text("this is a question !!", style="bold red"))
-    a = confirm_prompt(Text("this is a question !!", style="bold red"))
+    a = live_instance(LiveSettings(),Text("testing") )
     console.print(a)
     ...
 

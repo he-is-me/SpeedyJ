@@ -443,7 +443,7 @@ def ask_questions():
 
 
 
-ask_questions()
+# ask_questions()
 
 
 
