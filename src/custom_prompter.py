@@ -1,6 +1,8 @@
 from abc import abstractmethod
 from dataclasses import dataclass, fields
+from numbers import Number
 from types import FunctionType, LambdaType
+from color_palette import ClrPal
 from datetime import datetime, date, time 
 from typing import Any, Callable, Final, Literal, NamedTuple, NewType, Optional, TextIO, TypedDict
 from rich.live import Live
@@ -8,7 +10,16 @@ from rich.text import Text
 from rich.console import Console
 
 
+
+
+
+
 type Result = str
+type PromptStyle = Literal["custom_inline", "important","criticaly_important","default"]
+_PromptStyleMap: dict[PromptStyle, str] = {
+        "important": f"bold {ClrPal.ORG}",
+        "criticaly_important": f"bold {ClrPal.RED} underline",
+        "default": "bold"}
 
 HINT_STYLE: Final[str] = "[bold #EB05BD]"
 CRIT_ERR_STYLE: Final[str] = "[bold #EB2005 underline]"
@@ -32,7 +43,9 @@ class ErrorMsgs:
     invalid_dtype: str=f"{CRIT_ERR_STYLE}ERROR[/]: {WARN_ERR_STYLE}{{}}[/] {CRIT_ERR_STYLE}is not a valid datatype !"
     invalid_format: str=f"""{CRIT_ERR_STYLE}ERROR[/]: {WARN_ERR_STYLE}{{}}[/] {CRIT_ERR_STYLE}is not a valid format!
 Format must be {{}}"""
-    invalid_choice: str=f"{MINOR_ERR_STYLE} {{}}[/] {CRIT_ERR_STYLE}is an invalid choice !"
+    invalid_choice: str=f"{MINOR_ERR_STYLE}{{}}[/] {CRIT_ERR_STYLE}is an invalid choice !"
+    min_range_failure: str =f"{MINOR_ERR_STYLE}{{}}[/] [bold]is too small answer must be >={{}}"
+    max_range_failure: str =f"{MINOR_ERR_STYLE}{{}}[/] [bold]is too large answer must be <={{}}"
     not_skippable: str=f"{MINOR_ERR_STYLE}This question in NOT skippable !"
     validation_error: str=f"{WARN_ERR_STYLE}{{}}[/] {CRIT_ERR_STYLE}is an invalid answer !"
 
@@ -126,15 +139,63 @@ def prompt_date(prompt: str|Text,
 
 
 # prompts for a integer, float or math equation i.e 180 + 20 will return 200
-def prompt_numeric():
-    ...
+def prompt_numeric(prompt: str,
+                   style: PromptStyle="default",
+                   ret_type: type[int|float]=int,
+                   validation: Callable[[str], tuple[str,bool]]|None=None ,
+                   skippable: bool=False,
+                   min: int|float|None=None,
+                   max: int|float|None=None,
+                   show_range: bool=True,
+                   error_msgs: ErrorMsgs=ErrorMsgs()
+                   ) -> int|float|PromptResult:
+    
+    if min is not None and max is not None:
+        assert min != max
+    if style != "custom_inline":
+        prompt = style + prompt 
+    if show_range:
+        prompt = prompt + f" ({min if min is not None else "   "} - {max if max is not None else "   "}): "
+    else:
+        prompt = prompt + ": "
+
+    answer = _console.input(prompt)
+    if (empty_answer := answer.strip() == "") and not skippable:
+        return PromptResult(False,answer,error_msgs.not_skippable)
+    elif empty_answer and skippable:
+        return PromptResult(True,"",None)
+    try:
+        numeric_answer = ret_type(answer)
+    except Exception:
+        return PromptResult(False,answer,error_msgs.invalid_dtype.format(answer))
+    if min is not None and not (numeric_answer >= min):
+        return PromptResult(False,numeric_answer,error_msgs.min_range_failure.format(answer,min))
+    if max is not None and not (numeric_answer <= max):
+        return PromptResult(False,answer,error_msgs.max_range_failure.format(answer,max))
+    if validation is not None:
+        valid = validation(answer)
+        if not valid:
+            return PromptResult(False,answer,error_msgs.validation_error)
+    return numeric_answer
+  
+        
+
 
 # prompts for yes or no and true or false
-def prompt_confirm():
+def prompt_confirm(prompt: str,
+                  style: PromptStyle="default",
+                  skippable: bool=False,
+                  error_msgs: ErrorMsgs=ErrorMsgs()
+                  ) -> int|float|PromptResult:
+
+     
+    
+
     ...
 
 # prompts for time of day or elapsed time
 def prompt_time():
+
     ...
 
 
@@ -163,11 +224,21 @@ def prompt_str(prompt: str,
 
 
 def main():
-    with Live(Text("questions", style="bold green"), console=_console, auto_refresh=False) as live:
+    with Live(Text("", style="bold green"), console=_console, auto_refresh=False) as live:
         valid = False
         while not valid:
-            validation = prompt_date("What day were you born on ?", style="bold blue", ret_type=datetime)
+            validation = prompt_numeric(f"How many [bold {ClrPal.ORG}]BITCHES[/] you getting this year ?",
+                                        style="custom_inline",
+                                        ret_type=int,
+                                        skippable=True,
+                                        min=20,
+                                        max=400)
             if isinstance(validation, PromptResult):
+                if validation.success and validation.answer == "":
+                    _console.print(f"[{ClrPal.GRN}]SKIPPING ! :D")
+                    live.refresh()
+                    break
+                    
                 live.console.clear()
                 _console.print(validation.err_msg)
                 continue
