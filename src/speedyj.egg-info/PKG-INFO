@@ -1,0 +1,14 @@
+Metadata-Version: 2.4
+Name: speedyj
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: click>=8.3.1
+Requires-Dist: debugpy>=1.8.19
+Requires-Dist: questionary>=2.1.1
+Requires-Dist: rich>=14.2.0
+Requires-Dist: sqlcipher3>=0.6.2
+Requires-Dist: ulid-py>=1.1.0
+Dynamic: license-file

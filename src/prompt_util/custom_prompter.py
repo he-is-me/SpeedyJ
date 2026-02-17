@@ -1,6 +1,9 @@
 from abc import abstractmethod
+import builtins
 from dataclasses import dataclass, fields
 from numbers import Number
+from pickle import BUILD
+import sys
 from types import FunctionType, LambdaType
 from color_palette import ClrPal
 from datetime import datetime, date, time, timedelta 
@@ -10,6 +13,7 @@ from rich.text import Text
 from rich.console import Console
 
 
+_console = Console(color_system="truecolor")
 
 
 
@@ -20,7 +24,35 @@ type ValidTimeUnits = Literal["hour", "hours", "minute", "minutes", "seconds", "
 type TimeData = tuple[int|float, ValidCalendarUnits|ValidTimeUnits]
 
 
-VALID_TIME_UNITS = frozenset({"years", "yrs", "yr", "months","mth", "mths", "weeks","wk","wks",
+VALID_CALENDAR_UNITS = {
+        "year": frozenset({"yrs","yr", "years"}),
+        "month": frozenset({"mth","mths","months"}),
+        "week": frozenset({"wk","wks","weeks"}),
+        "day": frozenset({"days", "dy", "dys"}),
+                        }
+REV_VALID_CALENDAR_UNITS = {}
+
+VALID_TIME_UNITS = {
+        "hour": frozenset({"hr", "hrs", "hours"}),
+        "minute": frozenset({"min", "mins", "minutes"}),
+        "second": frozenset({"sec", "secs", "seconds"}),
+        "microsecond": frozenset({"mu", "msec", "microseconds"}),
+        }
+REV_VALID_TIME_UNITS = {}
+
+def create_reverse_dict(original: dict, *,reverse: dict):
+    for k,v in original.items():
+        if k in reverse or v in reverse:
+            raise ValueError("Duplicate found during reverse dict opp")
+        reverse[v] = k
+
+create_reverse_dict(VALID_TIME_UNITS,reverse=REV_VALID_TIME_UNITS)
+create_reverse_dict(VALID_CALENDAR_UNITS,reverse=REV_VALID_CALENDAR_UNITS)
+
+# _console.print(f"[bold {ClrPal.RED}]FORWARD DICT[/]{VALID_TIME_UNITS},\n\n[bold {ClrPal.RED}]REVERSE DICT[/]{REV_VALID_TIME_UNITS}")
+# _console.print(f"[bold {ClrPal.RED}]FORWARD DICT[/]{VALID_CALENDAR_UNITS},\n\n[bold {ClrPal.RED}]REVERSE DICT[/]{REV_VALID_CALENDAR_UNITS}")
+
+frozenset({"years", "yrs", "yr", "months","mth", "mths", "weeks","wk","wks",
                   "days","day", "hours","hrs","hr", "minutes", "min", "mins", "seconds",
                   "sec","secs", "microseconds", "ms"})
 
@@ -45,7 +77,6 @@ TIME_FMT: Final[str] = "%I:%M %p"
 ISO_TIME_FMT: Final[str] = "%H:%M:%S.%f"
 
 
-_console = Console(color_system="truecolor")
 
 @dataclass(slots=False,frozen=True)
 class ErrorMsgs:
@@ -263,22 +294,58 @@ def deduce_timedelta(answer: str):
         return 
     if len(answer_arr) == 2:
         time_amnt, time_unit = answer_arr
-    elif len(answer_arr)
+    elif len(answer_arr):
+        ...
+    
     ...
 
 
 def is_leap_year():
     curr_year = datetime.today().year
-    #NOTE: this shit makes my head spin trying to think about it 
-    # come back and get a understanding lmao this is so fucking simple yet so confusing** (im retarded)
-    return (curr_year % 4 == 0) and (curr_year % 100 != 0 or curr_year % 400 == 0)
+    return (curr_year % 4 == 0 and curr_year % 100 != 0) or curr_year % 400 == 0
+
+def is_int(x: str) -> bool:
+    try:
+        int(x)
+    except Exception:
+        return False
+    return True
+
+
+def is_float(x: str) -> bool:
+    try:
+        float(x)
+    except Exception:
+        return False
+    return True
+
+def is_cal_or_time_unit(x: str):
+    if (VALID_TIME_UNITS.get(x) is None and REV_VALID_TIME_UNITS.get(x) is None):
+        return False
+    
+
+def deduce_elapsed_time(answer: str):
+    split_units = answer.split()
+    num_time_units = len(split_units)
+    _console.print(split_units)
+    if num_time_units < 2 or num_time_units % 2 != 0:
+        return
+    for num,unit in split_units:
+        if not (num.isdigit() or is_float(num)) or not is_cal_or_time_unit(unit):
+            return 
+        else:
+            return (num, unit)
+
+
+
+    ...
 
 
 
 # prompts for time of day or elapsed time in Years, Months, Days, Hours, Minutes, Seconds and Microseconds 
 def prompt_time(prompt: str,
                 style: PromptStyle="default",
-                ret_type: type[time|timedelta|int|float|tuple[str,time]]=time,
+                ret_type: Literal["time","timedelta","int","float","tuple[str,time]"]="time",
                 as_iso: bool=False,
                 forced_unit: ValidCalendarUnits|ValidTimeUnits|None=None,
                 validation: Callable[[str], tuple[str,bool]]|None=None ,
@@ -288,22 +355,42 @@ def prompt_time(prompt: str,
                 max: int|float|time|timedelta|None=None,
                 ) -> int|float|timedelta|time|tuple[str,time]|PromptResult:
 
-    # if a forced_unit requires just a numeric value to be input and returned
-    assert (ret_type is int or ret_type is float) and forced_unit is None
+    ret_type_obj: type|None = getattr(builtins, ret_type, None)
+    if ret_type_obj is None:
+        raise AttributeError("Must provide a valid return type !")
+
+    """
+    forced_unit: ValidCalendarUnits|ValidTimeUnits|None=None 
+        Setting forced unit to one of the valid literals will restrict this 
+        function to only return integers or floats. This is because you forced_unit 
+        should only be used when you're asking the user a specific question that 
+        pertains to the specified calendar or time unit.
+
+        for example: How many hours will you work on this assignment ?: 
+            forced_unit = hours
+            function returns a int or float and the Question object 
+            does the work of turning the number into the proper datatype 
+    """
+
+    if forced_unit is not None and not (ret_type_obj is float or ret_type_obj is int):
+        raise TypeError("setting forced unit to any value other than None"
+                        "requires that you set ret_type_obj to float or int only",
+                        "see documentation for explanation")
 
     as_tuple = False
     if style != "custom_inline":
         prompt = _PromptStyleMap[style] + prompt + ": "
-    answer = _console.input(prompt)
+    answer = _console.input(prompt).strip()
 
-    if answer.strip() == "":
+    if answer == "":
         return check_skippability(skippable,
                                   error_msgs.not_skippable)
 
     #NOTE: move this into its own function called check_num_range() or some shit
-    if ret_type is int or ret_type is float and forced_unit is not None:
+
+    if ret_type_obj is int or ret_type_obj is float and forced_unit is not None:
         try:
-            num_answer = ret_type(answer)
+            num_answer = ret_type_obj(answer)
         except Exception:
             return PromptResult(False,answer,error_msgs.invalid_dtype.format(answer))
 
@@ -319,20 +406,23 @@ def prompt_time(prompt: str,
 
 
 
-    if ret_type is time or (as_tuple := ret_type == tuple[str,time]):
+    if ret_type_obj is time or (as_tuple := ret_type_obj == tuple[str,time]):
         if (time_answer := str_to_time(answer,as_iso)) is None:
             return PromptResult(False,answer, error_msgs.invalid_format.format(answer))
         return time_answer if not as_tuple else (answer, time_answer)
 
-    if forced_unit and len(answer.split()) > 2
 
-    if ret_type == timedelta: 
+    # we want elapsed time back from this 
+    if ret_type_obj == timedelta: 
+        leap_year = is_leap_year()
+
+
         try:
             datetime.strptime(answer, TIME_FMT)
         except Exception:
+            ...
 
 
-        ...
     
 
 
